@@ -1,6 +1,5 @@
 const fs = require('fs').promises
 const path = require('path')
-const { env, AutoTokenizer, AutoModel } = require('@xenova/transformers')
 
 // Store model and tokenizer globally to avoid reloading
 let model = null
@@ -26,8 +25,13 @@ class SimpleVectorStore {
 
     try {
       console.log('🔄 Loading transformer model (all-MiniLM-L6-v2)...')
+
+      // Dynamic import for ESM module support in CommonJS
+      const transformers = await import('@xenova/transformers');
+      const { env, AutoTokenizer, AutoModel } = transformers;
+
       env.allowLocalModels = false // Use HuggingFace cache
-      
+
       // Vercel compatibility: Redirect cache to /tmp
       if (process.env.VERCEL) {
         env.cacheDir = path.join('/tmp', 'transformers-cache')
@@ -35,13 +39,13 @@ class SimpleVectorStore {
       } else {
         env.cacheDir = path.join(process.cwd(), '.cache', 'transformers')
       }
-      
+
       // Use lightweight all-MiniLM-L6-v2 model
       tokenizer = await AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2')
       model = await AutoModel.from_pretrained('Xenova/all-MiniLM-L6-v2', {
         quantized: true, // Use quantized version for speed
       })
-      
+
       console.log('✅ Transformer model loaded successfully')
     } catch (error) {
       console.error('❌ Failed to load transformer model:', error.message)
@@ -104,7 +108,7 @@ class SimpleVectorStore {
 
       // Cache it
       embeddingCache[text] = normalized
-      
+
       // Debug log first embedding
       if (Object.keys(embeddingCache).length === 1) {
         console.log(`[EMBEDDING DEBUG] First embedding for "${text.substring(0, 30)}...": norm=${norm.toFixed(4)}, dims=${normalized.length}, tokens=${tokenCount}`)
@@ -163,11 +167,11 @@ class SimpleVectorStore {
         const parsed = JSON.parse(data)
         this.documents = parsed.documents || []
         this.embeddings = parsed.embeddings || {}
-        
+
         // Validate embeddings
         const docsWithEmbeddings = this.documents.filter(d => d.embedding && d.embedding.length > 0).length
         console.log(`   Loaded: ${this.documents.length} documents, ${docsWithEmbeddings} with embeddings`)
-        
+
         if (docsWithEmbeddings < this.documents.length * 0.5 && this.documents.length > 0) {
           console.log('⚠️  WARNING: >50% documents missing embeddings - clearing store')
           this.documents = []
@@ -208,12 +212,12 @@ class SimpleVectorStore {
     try {
       const dir = path.dirname(this.filePath)
       await fs.mkdir(dir, { recursive: true })
-      
+
       const data = {
         documents: this.documents,
         embeddings: this.embeddings,
       }
-      
+
       await fs.writeFile(this.filePath, JSON.stringify(data, null, 2))
     } catch (error) {
       console.error('Error saving vector store:', error.message)
@@ -234,7 +238,7 @@ class SimpleVectorStore {
       try {
         embedding = await SimpleVectorStore.getEmbedding(documents[i])
         successCount++
-        
+
         if (i < 2) {
           console.log(`  [ADD ${i}] "${ids[i]}": embedding generated, dims=${embedding?.length}`)
         }
@@ -302,7 +306,7 @@ class SimpleVectorStore {
       }
 
       // Category matching
-      if (doc.metadata?.category && queryWords.some(w => 
+      if (doc.metadata?.category && queryWords.some(w =>
         doc.metadata.category.toLowerCase().includes(w)
       )) {
         score += 0.1
@@ -332,10 +336,10 @@ class SimpleVectorStore {
     let queryEmbedding = null
     try {
       queryEmbedding = await SimpleVectorStore.getEmbedding(query)
-      
+
       console.log(`\n[DEBUG] Query embedding generated (${queryEmbedding ? queryEmbedding.length : 0} dims)`)
       console.log(`[DEBUG] Total documents in store: ${this.documents.length}`)
-      
+
       const scored = this.documents.map((doc) => {
         let similarity = 0
         if (doc.embedding && queryEmbedding) {
@@ -343,12 +347,12 @@ class SimpleVectorStore {
         }
         return { ...doc, similarity, distance: 1 - similarity }
       })
-      
+
       // Sort and log top 5 for debugging
       const sorted = scored.sort((a, b) => b.similarity - a.similarity)
       console.log(`[DEBUG] Top 5 similarity scores:`)
       sorted.slice(0, 5).forEach((r, i) => {
-        console.log(`  ${i+1}. "${r.metadata?.source}" (chunk ${r.metadata?.chunk_index}): ${(r.similarity*100).toFixed(2)}% - "${r.content.substring(0, 50).replace(/\n/g, ' ')}..."`)
+        console.log(`  ${i + 1}. "${r.metadata?.source}" (chunk ${r.metadata?.chunk_index}): ${(r.similarity * 100).toFixed(2)}% - "${r.content.substring(0, 50).replace(/\n/g, ' ')}..."`)
       })
 
       semanticResults = sorted
@@ -404,7 +408,7 @@ class SimpleVectorStore {
 
     console.log(`[HYBRID DEBUG] Final top ${results.length} results:`)
     results.forEach((r, i) => {
-      console.log(`  ${i+1}. "${r.metadata?.source}" chunk=${r.metadata?.chunk_index} | sem=${r.semanticSim.toFixed(3)} kw=${r.keywordScore.toFixed(3)} combined=${r.score.toFixed(3)}`)
+      console.log(`  ${i + 1}. "${r.metadata?.source}" chunk=${r.metadata?.chunk_index} | sem=${r.semanticSim.toFixed(3)} kw=${r.keywordScore.toFixed(3)} combined=${r.score.toFixed(3)}`)
     })
 
     return {
