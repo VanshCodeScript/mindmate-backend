@@ -26,8 +26,8 @@ class SimpleVectorStore {
     try {
       console.log('🔄 Loading transformer model (all-MiniLM-L6-v2)...')
 
-      // Dynamic import for ESM module support in CommonJS
-      const transformers = await import('@xenova/transformers');
+      // Use eval approach to prevent bundlers (ncc/webpack) from converting dynamic import to require()
+      const transformers = await eval('import("@xenova/transformers")');
       const { env, AutoTokenizer, AutoModel } = transformers;
 
       env.allowLocalModels = false // Use HuggingFace cache
