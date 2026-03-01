@@ -27,7 +27,14 @@ class SimpleVectorStore {
     try {
       console.log('🔄 Loading transformer model (all-MiniLM-L6-v2)...')
       env.allowLocalModels = false // Use HuggingFace cache
-      env.cacheDir = path.join(process.cwd(), '.cache', 'transformers')
+      
+      // Vercel compatibility: Redirect cache to /tmp
+      if (process.env.VERCEL) {
+        env.cacheDir = path.join('/tmp', 'transformers-cache')
+        console.log('📦 Vercel detected: Redirecting transformer cache to /tmp')
+      } else {
+        env.cacheDir = path.join(process.cwd(), '.cache', 'transformers')
+      }
       
       // Use lightweight all-MiniLM-L6-v2 model
       tokenizer = await AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2')
@@ -192,6 +199,12 @@ class SimpleVectorStore {
    * Save store to file
    */
   async save() {
+    // Vercel compatibility: Skip saving to read-only filesystem
+    if (process.env.VERCEL) {
+      // console.log('💾 Skipping vector store save on Vercel (read-only FS)')
+      return
+    }
+
     try {
       const dir = path.dirname(this.filePath)
       await fs.mkdir(dir, { recursive: true })

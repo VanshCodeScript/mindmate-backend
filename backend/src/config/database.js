@@ -28,7 +28,11 @@ const connectDB = async () => {
     return conn;
   } catch (error) {
     console.error('❌ MongoDB Connection Failed:', error.message);
-    process.exit(1);
+    // On Vercel (Serverless), we don't want to exit the process
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
+    throw error;
   }
 };
 
